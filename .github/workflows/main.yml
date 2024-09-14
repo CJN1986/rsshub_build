@@ -6,12 +6,17 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '3 8 * * 1'
+    - cron: '7 8 * * 1'
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+      # Install GitHub CLI
+      - name: Install GitHub CLI
+        run: sudo apt install gh
+
       # Checkout the source repository
       - name: Checkout source repository
         uses: actions/checkout@v2
@@ -75,12 +80,37 @@ jobs:
           SOURCE_SHA=$(git rev-parse --short=10 HEAD)
           echo "::set-output name=SOURCE_SHA::$SOURCE_SHA"
 
+      # Delete existing tag and release if they exist
+      - name: Delete existing tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # setup GH_TOKEN
+        run: |
+          TAG_NAME="latest"
+          cd rsshub_build
+          echo "Fetching tags from origin"
+          git fetch --tags  # Fetch latest tags
+          echo "Attempting to delete local tag $TAG_NAME"
+          git tag -d $TAG_NAME || true
+          echo "Attempting to delete remote tag $TAG_NAME"
+          git push origin :refs/tags/$TAG_NAME || true
+          
+          # Get all releases with the tag 'latest'
+          RELEASE_IDS=$(gh api "repos/${{ github.repository }}/releases" -q '.[] | select(.tag_name == "latest") | .id')
+          
+          # Delete all found releases with the tag 'latest'
+          for RELEASE_ID in $RELEASE_IDS; do
+            if [ -n "$RELEASE_ID" ]; then
+              echo "Deleting release with ID $RELEASE_ID"
+              gh api "repos/${{ github.repository }}/releases/$RELEASE_ID" -X DELETE
+            fi
+          done
+
       # Create Git tag using the shortened source repository commit SHA
       - name: Create Git tag
         id: create_tag
         run: |
           cd rsshub_build
-          TAG_NAME=${{ steps.get_source_sha.outputs.SOURCE_SHA }}
+          TAG_NAME="latest"
           git tag $TAG_NAME
           git push origin $TAG_NAME
           echo "::set-output name=TAG_NAME::$TAG_NAME"
