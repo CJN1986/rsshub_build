@@ -1,0 +1,96 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '3 8 * * 1'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the source repository
+      - name: Checkout source repository
+        uses: actions/checkout@v2
+        with:
+          repository: DIYgod/RSSHub
+          path: source_repo
+
+      # Checkout your own repository
+      - name: Checkout your repository
+        uses: actions/checkout@v2
+        with:
+          path: rsshub_build
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # Install pnpm
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      # Install dependencies using pnpm
+      - name: Install dependencies
+        run: |
+          cd source_repo
+          pnpm install
+
+      # Install dotenv using pnpm
+      - name: Install dotenv
+        run: |
+          cd source_repo
+          pnpm add dotenv
+
+      # Build project using pnpm
+      - name: Build project
+        run: |
+          cd source_repo
+          pnpm run build
+
+      # Zip the build directory
+      - name: Zip the build directory
+        run: |
+          cd source_repo
+          tar zcvf ../rsshub_build/build.tar.gz ./*
+
+      # Configure Git
+      - name: Configure Git
+        run: |
+          cd rsshub_build
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      # Get the current commit SHA of the source repository and shorten it
+      - name: Get source repo commit SHA
+        id: get_source_sha
+        run: |
+          cd source_repo
+          SOURCE_SHA=$(git rev-parse --short=10 HEAD)
+          echo "::set-output name=SOURCE_SHA::$SOURCE_SHA"
+
+      # Create Git tag using the shortened source repository commit SHA
+      - name: Create Git tag
+        id: create_tag
+        run: |
+          cd rsshub_build
+          TAG_NAME=${{ steps.get_source_sha.outputs.SOURCE_SHA }}
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+          echo "::set-output name=TAG_NAME::$TAG_NAME"
+
+      # Upload to GitHub Releases
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: rsshub_build/build.tar.gz
+          tag_name: ${{ steps.create_tag.outputs.TAG_NAME }}
+          body: "Source repository commit: https://github.com/DIYgod/RSSHub/tree/${{ steps.get_source_sha.outputs.SOURCE_SHA }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
