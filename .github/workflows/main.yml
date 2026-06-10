@@ -2,9 +2,9 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [ tmp ]
   pull_request:
-    branches: [ main ]
+    branches: [ tmp ]
   schedule:
     - cron: '14 8 */3 * *'
 
@@ -17,11 +17,12 @@ jobs:
       - name: Install GitHub CLI
         run: sudo apt install gh
 
-      # Checkout the source repository
+      # Checkout the source repository (Modified to FlanChanXwO's branch)
       - name: Checkout source repository
         uses: actions/checkout@v2
         with:
-          repository: DIYgod/RSSHub
+          repository: FlanChanXwO/RSSHub  # 更改为修复版仓库
+          ref: route/nhentai               # 指定要构建的分支
           path: source_repo
 
       # Checkout your own repository
@@ -78,7 +79,7 @@ jobs:
         run: |
           cd source_repo
           SOURCE_SHA=$(git rev-parse --short=10 HEAD)
-          echo "::set-output name=SOURCE_SHA::$SOURCE_SHA"
+          echo "SOURCE_SHA=$SOURCE_SHA" >> $GITHUB_OUTPUT # 修复旧的 set-output 语法
 
       # Delete existing tag and release if they exist
       - name: Delete existing tag and release
@@ -113,7 +114,7 @@ jobs:
           TAG_NAME="latest"
           git tag $TAG_NAME
           git push origin $TAG_NAME
-          echo "::set-output name=TAG_NAME::$TAG_NAME"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT # 修复旧的 set-output 语法
 
       # Upload to GitHub Releases
       - name: Upload to GitHub Releases
@@ -121,6 +122,6 @@ jobs:
         with:
           files: rsshub_build/build.tar.gz
           tag_name: ${{ steps.create_tag.outputs.TAG_NAME }}
-          body: "Source repository commit: https://github.com/DIYgod/RSSHub/tree/${{ steps.get_source_sha.outputs.SOURCE_SHA }}"
+          body: "Source repository commit: https://github.com/FlanChanXwO/RSSHub/tree/${{ steps.get_source_sha.outputs.SOURCE_SHA }}" # 更改链接指向
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
