@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Install GitHub CLI
+      # Install GitHub CLI1
       - name: Install GitHub CLI
         run: sudo apt install gh
 
